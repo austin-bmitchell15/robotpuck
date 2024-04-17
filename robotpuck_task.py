@@ -25,6 +25,8 @@ class RobotPuckTask(BaseTask):
         # TODO randomize these
         self._ball_position = [0.0, 2.0, 0.0] 
         self._goal_position = [0.0, 6.0, 0.0]
+        
+        self._max_push_effort = 400.0
 
         # values used for defining RL buffers
         self._num_observations = 3
@@ -83,6 +85,14 @@ class RobotPuckTask(BaseTask):
         
         # Reset ball and goal positions
         # TODO random goal positionining here
+
+        dof_pos = torch.zeros((num_resets, self._cartpoles.num_dof), device=self._device)
+        dof_vel = torch.zeros((num_resets, self._cartpoles.num_dof), device=self._device)
+
+        indices = env_ids.to(dtype=torch.int32)
+        self._robot.set_joint_positions(dof_pos, indices=indices)
+        self._robot.set_joint_velocities(dof_vel, indices=indices)
+
         self.resets[env_ids] = 0
 
     def pre_physics_step(self, actions) -> None:
@@ -92,24 +102,25 @@ class RobotPuckTask(BaseTask):
 
         actions = torch.tensor(actions)
 
-        forces = torch.zeros((self._cartpoles.count, self._cartpoles.num_dof), dtype=torch.float32, device=self._device)
-        forces[:, self._cart_dof_idx] = self._max_push_effort * actions[0]
+        forces = torch.zeros((self._robot.count, self._robot.num_dof), dtype=torch.float32, device=self._device)
+        forces[:, :] = self._max_push_effort * actions[0]
 
-        indices = torch.arange(self._cartpoles.count, dtype=torch.int32, device=self._device)
-        self._cartpoles.set_joint_efforts(forces, indices=indices)
+        indices = torch.arange(self._robot.count, dtype=torch.int32, device=self._device)
+        self._robot.set_joint_efforts(forces, indices = indices)
     
     def get_observations(self):
         tool_pos, tool_rot = self.tool_view.get_world_poses(clone=False) 
-        self.obs = tool_pos
+        self.obs[:, :] = tool_pos
         return self.obs
+
+    def calculate_metrics(self) -> None:
+        tool_pos = self.obs
+
+        target = torch.Tensor([0.5, 0.0, 0.5])
+        reward = -torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        #reward += 0.05
+
+        return reward.item()
     
     def is_done(self) -> None:
-        cart_pos = self.obs[:, 0]
-        pole_pos = self.obs[:, 2]
-
-        # reset the robot if cart has reached reset_dist or pole is too far from upright
-        resets = torch.where(torch.abs(cart_pos) > self._reset_dist, 1, 0)
-        resets = torch.where(torch.abs(pole_pos) > math.pi / 2, 1, resets)
-        self.resets = resets
-
-        return resets.item()
+        return 0
