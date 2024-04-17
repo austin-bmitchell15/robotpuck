@@ -83,11 +83,13 @@ class RobotPuckTask(BaseTask):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self._device)
         
+        num_resets = len(env_ids)
+        
         # Reset ball and goal positions
         # TODO random goal positionining here
 
-        dof_pos = torch.zeros((num_resets, self._cartpoles.num_dof), device=self._device)
-        dof_vel = torch.zeros((num_resets, self._cartpoles.num_dof), device=self._device)
+        dof_pos = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
+        dof_vel = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
 
         indices = env_ids.to(dtype=torch.int32)
         self._robot.set_joint_positions(dof_pos, indices=indices)
