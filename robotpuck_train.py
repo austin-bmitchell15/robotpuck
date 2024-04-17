@@ -23,7 +23,7 @@ model = PPO(
     verbose=1,
     tensorboard_log="./robotpuck_tensorboard"
 )
-model.learn(total_timesteps=100000)
-model.save("ppo_cartpole")
+model.learn(total_timesteps=200000)
+model.save("3000_force_new_reward_train")
 
 env.close()

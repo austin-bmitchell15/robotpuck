@@ -23,10 +23,11 @@ class RobotPuckTask(BaseTask):
         # task-specific parameters
         self._robot_arm_pos = [0.0, 0.0, 0.0]
         # TODO randomize these
-        self._ball_position = [0.0, 2.0, 0.0] 
+        self._ball_position = [0.5, 0.0, 0.5] 
         self._goal_position = [0.0, 6.0, 0.0]
         
-        self._max_push_effort = 400.0
+        self._max_push_effort = torch.Tensor([3360.0, 3360.0, 1680.0, 720.0, 720.0, 720.0,])
+        self.prev_distance = -1.0
 
         # values used for defining RL buffers
         self._num_observations = 3
@@ -78,6 +79,7 @@ class RobotPuckTask(BaseTask):
         # TODO add random goal positioning here
         indices = torch.arange(self._robot.count, dtype=torch.int64, device=self._device)
         self.reset(indices)
+        print(self._robot.dof_names)
 
     def reset(self, env_ids=None):
         if env_ids is None:
@@ -112,17 +114,23 @@ class RobotPuckTask(BaseTask):
     
     def get_observations(self):
         tool_pos, tool_rot = self.tool_view.get_world_poses(clone=False) 
+        print(tool_rot)
         self.obs[:, :] = tool_pos
         return self.obs
 
     def calculate_metrics(self) -> None:
         tool_pos = self.obs
-
         target = torch.Tensor([0.5, 0.0, 0.5])
-        reward = -torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
-        #reward += 0.05
-
-        return reward.item()
+        reward = 0.00
+        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        if self.prev_distance < 0:
+            self.prev_distance = curr_distance
+        else:
+            reward += self.prev_distance - curr_distance
+            self.prev_distance = curr_distance
+        if curr_distance < 0.05:
+            reward += 0.5
+        return reward
     
     def is_done(self) -> None:
         return 0
