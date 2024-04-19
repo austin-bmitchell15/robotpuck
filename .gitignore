@@ -196,3 +196,6 @@ pyrightconfig.json
 /.vscode/extensions.json
 /.vscode/launch.json
 /.vscode/settings.json
+
+*.zip
+/robotpuck_tensorboard
