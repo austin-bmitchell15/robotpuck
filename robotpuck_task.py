@@ -30,10 +30,14 @@ class RobotPuckTask(BaseTask):
         self.prev_distance = -1.0
 
         # values used for defining RL buffers
-        self._num_observations = 3
+        self._num_observations = 15
         self._num_actions = 6
         self._device = "cpu"
         self.num_envs = 1
+
+        self.tool_obs_slice = slice(0, 3)
+        self.dof_pos_obs_slice = slice(3, 9)
+        self.dof_vel_obs_slice = slice(9, 15)
 
         # a few class buffers to store RL-related states
         self.obs = torch.zeros((self.num_envs, self._num_observations))
@@ -53,18 +57,19 @@ class RobotPuckTask(BaseTask):
         BaseTask.__init__(self, name=name, offset=offset)
 
     def set_up_scene(self, scene) -> None:
-        # retrieve file path for the Cartpole USD file
+        # retrieve file path for the robot USD file
         assets_root_path = get_assets_root_path()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur3/ur3.usd"
-        # add the Cartpole USD to our stage
+        # add the robot USD to our stage
         create_prim(prim_path="/World/Robot", prim_type="Xform", position=self._robot_arm_pos)
         add_reference_to_stage(usd_path, "/World/Robot")
         create_prim(prim_path="/World/Ball", prim_type="Sphere", attributes={"radius": 0.1}, position=self._ball_position)
         create_prim(prim_path="/World/Goal", prim_type="Sphere", attributes={"radius": 0.05}, position=self._goal_position)
-        # create an ArticulationView wrapper for our cartpole - this can be extended towards accessing multiple cartpoles
+
         self._robot = ArticulationView(prim_paths_expr="/World/Robot*", name="robot_view")
         self.tool_view = RigidPrimView(prim_paths_expr="/World/Robot/tool0", name="tool_view", reset_xform_properties=False)
-        # add Cartpole ArticulationView and ground plane to the Scene
+
+        # add ArticulationView and ground plane to the Scene
         scene.add(self.tool_view) 
         scene.add(self._robot)
         scene.add_default_ground_plane()
@@ -113,23 +118,32 @@ class RobotPuckTask(BaseTask):
         self._robot.set_joint_efforts(forces, indices = indices)
     
     def get_observations(self):
-        tool_pos, tool_rot = self.tool_view.get_world_poses(clone=False) 
-        print(tool_rot)
-        self.obs[:, :] = tool_pos
+        tool_pos, tool_rot = self.tool_view.get_world_poses(clone=False)
+
+        dof_pos = self._robot.get_joint_positions()
+        dof_vel = self._robot.get_joint_velocities()
+
+        self.obs[:, self.tool_obs_slice] = tool_pos
+        self.obs[:, self.dof_pos_obs_slice] = dof_pos
+        self.obs[:, self.dof_vel_obs_slice] = dof_vel
         return self.obs
 
     def calculate_metrics(self) -> None:
-        tool_pos = self.obs
+        tool_pos = self.obs[:, self.tool_obs_slice]
         target = torch.Tensor([0.5, 0.0, 0.5])
-        reward = 0.00
+        reward = 0.0
         curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+
         if self.prev_distance < 0:
-            self.prev_distance = curr_distance
+            pass
         else:
-            reward += self.prev_distance - curr_distance
-            self.prev_distance = curr_distance
+            mult = 1.5 if curr_distance > self.prev_distance else 1.0
+            reward += mult * (self.prev_distance - curr_distance)
+
         if curr_distance < 0.05:
             reward += 0.5
+
+        self.prev_distance = curr_distance
         return reward
     
     def is_done(self) -> None:
