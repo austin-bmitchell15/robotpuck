@@ -84,6 +84,7 @@ class RobotPuckTask(BaseTask):
         # TODO add random goal positioning here
         indices = torch.arange(self._robot.count, dtype=torch.int64, device=self._device)
         self.reset(indices)
+        self._robot.switch_control_mode("effort")
         print(self._robot.dof_names)
 
     def reset(self, env_ids=None):
@@ -130,21 +131,39 @@ class RobotPuckTask(BaseTask):
 
     def calculate_metrics(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
+        dof_vel = self.obs[:, self.dof_vel_obs_slice]
         target = torch.Tensor([0.5, 0.0, 0.5])
-        reward = 0.0
         curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        # if curr_distance > 0.7:
+        #     reward -= 2.0
 
+        # if self.prev_distance < 0:
+        #     pass
+        # else:
+        #     mult = 1.5 if curr_distance > self.prev_distance else 1.0
+        #     reward += mult * (self.prev_distance - curr_distance)
+
+        # if curr_distance < 0.05:
+        #     reward += 0.5
         if self.prev_distance < 0:
-            pass
-        else:
             mult = 1.5 if curr_distance > self.prev_distance else 1.0
-            reward += mult * (self.prev_distance - curr_distance)
+            reward = 1.0 - mult * (self.prev_distance - curr_distance) - 0.01 * torch.sum(torch.abs(dof_vel))
+        else:
+            reward = 1.0 - curr_distance - 0.01 * torch.sum(torch.abs(dof_vel))
+        reward = torch.where(curr_distance < 0.05, torch.ones_like(reward) * 2.0, reward)
+        reward = torch.where(curr_distance > 0.4, torch.ones_like(reward) * -2.0, reward)
 
-        if curr_distance < 0.05:
-            reward += 0.5
 
         self.prev_distance = curr_distance
-        return reward
+        return reward.item()
     
     def is_done(self) -> None:
-        return 0
+        tool_pos = self.obs[:, self.tool_obs_slice]
+        target = torch.Tensor([0.5, 0.0, 0.5])
+
+        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        
+        resets = torch.where(curr_distance > 0.4, 1, 0)
+        self.resets = resets
+
+        return resets.item()

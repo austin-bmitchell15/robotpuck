@@ -199,3 +199,5 @@ pyrightconfig.json
 
 *.zip
 /robotpuck_tensorboard
+/hyperparam_optimization
+/cartpole_tensorboard
