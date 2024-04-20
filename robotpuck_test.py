@@ -1,5 +1,5 @@
 from omni.isaac.gym.vec_env import VecEnvBase
-env = VecEnvBase(headless=True)
+env = VecEnvBase(headless=False)
 
 import matplotlib.pyplot as plt
 
