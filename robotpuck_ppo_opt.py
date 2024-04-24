@@ -21,13 +21,13 @@ def objective(trial: optuna.Trial) -> float:
     env._world.reset()
     obs, _ = env.reset()
 
-    gamma = trial.suggest_categorical("gamma", [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
-    learning_rate = trial.suggest_float("learning_rate", 1e-5, 0.01, log=True)
-    ent_coef = trial.suggest_float("ent_coef", 0.00000001, 0.1, log=True)
-    clip_range = trial.suggest_categorical("clip_range", [0.1, 0.2, 0.3, 0.4])
-    n_epochs = trial.suggest_categorical("n_epochs", [1, 5, 10, 20])
-    max_grad_norm = trial.suggest_categorical("max_grad_norm", [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
-    vf_coef = trial.suggest_float("vf_coef", 0, 1)
+    clip_range = trial.suggest_float('clip_range', 0.1, 0.4, log=True)
+    n_epochs = trial.suggest_int('n_epochs', 1, 10)
+    learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)
+    gamma = trial.suggest_float('gamma', 0.8, 0.9999)
+    ent_coef = trial.suggest_float('ent_coef', 0.00001, 0.1, log=True)
+    vf_coef = trial.suggest_float('vf_coef', 0.1, 1.0, log=True)
+    max_grad_norm = trial.suggest_float('max_grad_norm', 0.5, 5)
     model = PPO(
         "MlpPolicy",
         env,
@@ -42,9 +42,9 @@ def objective(trial: optuna.Trial) -> float:
         vf_coef=vf_coef,
         max_grad_norm=max_grad_norm,
         verbose=0,
-        tensorboard_log="./hyperparam_optimization/run2"
+        tensorboard_log="./hyperparam_optimization/run4"
     )
-    model.learn(total_timesteps=100000)
+    model.learn(total_timesteps=200000)
 
     reward_history = []
     max_iter = 2000
@@ -62,7 +62,7 @@ def objective(trial: optuna.Trial) -> float:
         num_iters = len(reward_history)
         if num_iters >= max_iter:
             break
-    return torch.Tensor(reward_history).mean()
+    return torch.mean(torch.Tensor(reward_history)).item()
     
 study = optuna.create_study(direction='maximize')
 study.optimize(objective, n_trials=100)

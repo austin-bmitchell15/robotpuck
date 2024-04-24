@@ -17,15 +17,15 @@ model = PPO(
     n_steps=1000,
     clip_range=0.2,
     batch_size=1000,
-    n_epochs=20,
-    learning_rate=0.0029518299325224915,
+    n_epochs=5,
+    learning_rate=0.005405026167593133,
     gamma=0.999,
     device="cuda:0",
     ent_coef=4.33542408133457e-05,
-    vf_coef=0.823899920256394,
+    vf_coef=0.0020737398594318467,
     max_grad_norm=0.9,
     verbose=1,
     tensorboard_log="./robotpuck_tensorboard"
 )
-model.learn(total_timesteps=100000)
+model.learn(total_timesteps=1000000)
 model.save("joint_obs_test")

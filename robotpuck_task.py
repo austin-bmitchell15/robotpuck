@@ -129,34 +129,52 @@ class RobotPuckTask(BaseTask):
         self.obs[:, self.dof_vel_obs_slice] = dof_vel
         return self.obs
 
+    # def calculate_metrics(self) -> None:
+    #     tool_pos = self.obs[:, self.tool_obs_slice]
+    #     dof_vel = self.obs[:, self.dof_vel_obs_slice]
+    #     target = torch.Tensor([0.5, 0.0, 0.5])
+    #     curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+    #     # if curr_distance > 0.7:
+    #     #     reward -= 2.0
+
+    #     # if self.prev_distance < 0:
+    #     #     pass
+    #     # else:
+    #     #     mult = 1.5 if curr_distance > self.prev_distance else 1.0
+    #     #     reward += mult * (self.prev_distance - curr_distance)
+
+    #     # if curr_distance < 0.05:
+    #     #     reward += 0.5
+    #     reward = 1.0 - curr_distance*curr_distance - 0.01 * torch.sum(torch.abs(dof_vel))
+    #     reward = torch.where(curr_distance > 0.4, torch.ones_like(reward) * -2.0, reward)
+
+
+    #     self.prev_distance = curr_distance
+    #     return reward.item()
+    
     def calculate_metrics(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
         dof_vel = self.obs[:, self.dof_vel_obs_slice]
-        target = torch.Tensor([0.5, 0.0, 0.5])
-        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
-        # if curr_distance > 0.7:
-        #     reward -= 2.0
+        target = torch.Tensor(self._goal_position)
+        curr_distance = torch.norm(tool_pos[:, :3] - target, dim=1)
 
-        # if self.prev_distance < 0:
-        #     pass
-        # else:
-        #     mult = 1.5 if curr_distance > self.prev_distance else 1.0
-        #     reward += mult * (self.prev_distance - curr_distance)
-
-        # if curr_distance < 0.05:
-        #     reward += 0.5
+        # Calculate distance improvement
         if self.prev_distance < 0:
-            mult = 1.5 if curr_distance > self.prev_distance else 1.0
-            reward = 1.0 - mult * (self.prev_distance - curr_distance) - 0.01 * torch.sum(torch.abs(dof_vel))
+            distance_improvement = torch.zeros_like(curr_distance)
         else:
-            reward = 1.0 - curr_distance - 0.01 * torch.sum(torch.abs(dof_vel))
-        reward = torch.where(curr_distance < 0.05, torch.ones_like(reward) * 2.0, reward)
-        reward = torch.where(curr_distance > 0.4, torch.ones_like(reward) * -2.0, reward)
+            distance_improvement = self.prev_distance - curr_distance
 
+        # Configure rewards
+        reward = 10 * distance_improvement - 0.01 * torch.sum(torch.abs(dof_vel))
 
+        # Bonus for reaching the goal
+        goal_reached_bonus = torch.ones_like(reward) * torch.where(curr_distance < 0.05, 5.0, 0.0)
+        reward += goal_reached_bonus
+
+        # Update previous distance
         self.prev_distance = curr_distance
         return reward.item()
-    
+
     def is_done(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
         target = torch.Tensor([0.5, 0.0, 0.5])

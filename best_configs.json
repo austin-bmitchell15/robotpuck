@@ -1,5 +1,5 @@
 {
-    "30_trial_run": {
+    "trial_25_run1": {
         "gamma": 0.999,
         "learning_rate": 0.005405026167593133,
         "ent_coef": 4.33542408133457e-05, 
@@ -8,7 +8,7 @@
         "max_grad_norm": 0.9, 
         "vf_coef": 0.0020737398594318467
     },
-    "100_trial_run": {
+    "run2": {
         "gamma": 0.999, 
         "learning_rate": 0.0029518299325224915, 
         "ent_coef": 0.0001438665200368852, 
