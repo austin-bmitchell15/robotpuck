@@ -202,3 +202,4 @@ pyrightconfig.json
 /hyperparam_optimization
 /cartpole_tensorboard
 /ddpg_optimization
+/a2c_optimization

@@ -23,7 +23,7 @@ class RobotPuckTask(BaseTask):
         # task-specific parameters
         self._robot_arm_pos = [0.0, 0.0, 0.0]
         # TODO randomize these
-        self._ball_position = [0.5, 0.0, 0.5] 
+        self._ball_position = torch.rand(3) * 0.25
         self._goal_position = [0.0, 6.0, 0.0]
         
         self._max_push_effort = torch.Tensor([3360.0, 3360.0, 1680.0, 720.0, 720.0, 720.0,])
@@ -132,7 +132,7 @@ class RobotPuckTask(BaseTask):
     def calculate_metrics(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
         dof_vel = self.obs[:, self.dof_vel_obs_slice]
-        target = torch.Tensor([0.5, 0.0, 0.5])
+        target = self._ball_position
         curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
         # if curr_distance > 0.7:
         #     reward -= 2.0
@@ -155,7 +155,7 @@ class RobotPuckTask(BaseTask):
 
     def is_done(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
-        target = torch.Tensor([0.5, 0.0, 0.5])
+        target = self._ball_position
 
         curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
         
