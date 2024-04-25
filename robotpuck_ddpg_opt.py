@@ -66,5 +66,5 @@ def objective(trial: optuna.Trial) -> float:
     return torch.mean(torch.Tensor(reward_history)).item()
     
 study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=30)
+study.optimize(objective, n_trials=50)
 print(study.best_params)

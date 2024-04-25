@@ -201,3 +201,4 @@ pyrightconfig.json
 /robotpuck_tensorboard
 /hyperparam_optimization
 /cartpole_tensorboard
+/ddpg_optimization
