@@ -11,7 +11,7 @@
         }
     },
     "trial14_run1": {
-        "reward_average": 0.888436496257782,
+        "reward_average": 0.8236244916915894,
         "config": {
             "n_steps": 10,
             "learning_rate": 0.0001545611100639787,

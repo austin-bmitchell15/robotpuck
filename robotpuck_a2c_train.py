@@ -16,12 +16,12 @@ from stable_baselines3 import A2C
 model = A2C(
     "MlpPolicy",
     env,
-    learning_rate=0.000568693678278647,
-    n_steps=100,
+    learning_rate=0.0001545611100639787,
+    n_steps=10,
     gamma=0.9743440077383112,
-    gae_lambda=0.9213666920087923,
-    ent_coef=0.015497025538787557,
-    vf_coef=0.7572941832896481,
+    gae_lambda=0.9873083102572288,
+    ent_coef=0.0976156773245273,
+    vf_coef=0.42864533956805395,
     verbose=1
 )
 
