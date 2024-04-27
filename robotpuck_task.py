@@ -23,14 +23,14 @@ class RobotPuckTask(BaseTask):
         # task-specific parameters
         self._robot_arm_pos = [0.0, 0.0, 0.0]
         # TODO randomize these
-        self._ball_position = torch.rand(3) * 0.25
+        self._ball_position = torch.rand(3) * 0.15 + 0.25
         self._goal_position = [0.0, 6.0, 0.0]
         
         self._max_push_effort = torch.Tensor([3360.0, 3360.0, 1680.0, 720.0, 720.0, 720.0,])
         self.prev_distance = -1.0
 
         # values used for defining RL buffers
-        self._num_observations = 15
+        self._num_observations = 18
         self._num_actions = 6
         self._device = "cpu"
         self.num_envs = 1
@@ -38,6 +38,7 @@ class RobotPuckTask(BaseTask):
         self.tool_obs_slice = slice(0, 3)
         self.dof_pos_obs_slice = slice(3, 9)
         self.dof_vel_obs_slice = slice(9, 15)
+        self.dof_ball_pos_slice = slice(15,18)
 
         # a few class buffers to store RL-related states
         self.obs = torch.zeros((self.num_envs, self._num_observations))
@@ -67,11 +68,13 @@ class RobotPuckTask(BaseTask):
         create_prim(prim_path="/World/Goal", prim_type="Sphere", attributes={"radius": 0.05}, position=self._goal_position)
 
         self._robot = ArticulationView(prim_paths_expr="/World/Robot*", name="robot_view")
+        self._ball = RigidPrimView(prim_paths_expr="/World/Ball*", name="ball_view")
         self.tool_view = RigidPrimView(prim_paths_expr="/World/Robot/tool0", name="tool_view", reset_xform_properties=False)
 
         # add ArticulationView and ground plane to the Scene
         scene.add(self.tool_view) 
         scene.add(self._robot)
+        scene.add(self._ball)
         scene.add_default_ground_plane()
 
         # set default camera viewport position and target
@@ -94,14 +97,17 @@ class RobotPuckTask(BaseTask):
         num_resets = len(env_ids)
         
         # Reset ball and goal positions
-        # TODO random goal positionining here
+        
+
 
         dof_pos = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
         dof_vel = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
+        self._ball_position = torch.rand((num_resets, 3)) * 0.15 + 0.25
 
         indices = env_ids.to(dtype=torch.int32)
         self._robot.set_joint_positions(dof_pos, indices=indices)
         self._robot.set_joint_velocities(dof_vel, indices=indices)
+        self._ball.set_world_poses(self._ball_position)
 
         self.resets[env_ids] = 0
 
@@ -123,17 +129,19 @@ class RobotPuckTask(BaseTask):
 
         dof_pos = self._robot.get_joint_positions()
         dof_vel = self._robot.get_joint_velocities()
+        dof_ball_pos = self._ball_position
 
         self.obs[:, self.tool_obs_slice] = tool_pos
         self.obs[:, self.dof_pos_obs_slice] = dof_pos
         self.obs[:, self.dof_vel_obs_slice] = dof_vel
+        self.obs[:, self.dof_ball_pos_slice] = dof_ball_pos
         return self.obs
 
     def calculate_metrics(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
         dof_vel = self.obs[:, self.dof_vel_obs_slice]
         target = self._ball_position
-        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[:, 0]) + torch.square(tool_pos[:, 1]  - target[:, 1]) + torch.square(tool_pos[:, 2]  - target[:, 2]))
         # if curr_distance > 0.7:
         #     reward -= 2.0
 
@@ -157,7 +165,8 @@ class RobotPuckTask(BaseTask):
         tool_pos = self.obs[:, self.tool_obs_slice]
         target = self._ball_position
 
-        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[:, 0]) + torch.square(tool_pos[:, 1]  - target[:, 1]) + torch.square(tool_pos[:, 2]  - target[:, 2]))
+
         
         resets = torch.where(curr_distance > 0.4, 1, 0)
         self.resets = resets
