@@ -23,14 +23,24 @@ class RobotPuckTask(BaseTask):
         # task-specific parameters
         self._robot_arm_pos = [0.0, 0.0, 0.0]
         # TODO randomize these
-        self._ball_position = torch.rand(3) * 0.25
+        #self._ball_position = torch.rand(3) * 0.25
+        self._ball_position = torch.tensor([0.4, 0.0, 0.4])
         self._goal_position = [0.0, 6.0, 0.0]
         
-        self._max_push_effort = torch.Tensor([3360.0, 3360.0, 1680.0, 720.0, 720.0, 720.0,])
+        #self._max_push_effort = torch.Tensor([3360.0, 3360.0, 1680.0, 720.0, 720.0, 720.0,])
+        self.max_velocity_command = 0.5
+
+        # Normalize observations
+        # Elbow joint appears to have limit of math.pi, but probably doesn't matter
+        self.norm_dof_pos = math.pi * 2.0
+        #Obs may exceed max_vel_command slightly, but assuming it's fine
+        #Obviously will not work in force control mode
+        self.norm_dof_vel = self.max_velocity_command
+
         self.prev_distance = -1.0
 
         # values used for defining RL buffers
-        self._num_observations = 15
+        self._num_observations = 19
         self._num_actions = 6
         self._device = "cpu"
         self.num_envs = 1
@@ -38,6 +48,12 @@ class RobotPuckTask(BaseTask):
         self.tool_obs_slice = slice(0, 3)
         self.dof_pos_obs_slice = slice(3, 9)
         self.dof_vel_obs_slice = slice(9, 15)
+        self.target_dist_obs_slice = slice(15, 18)
+        self.time_obs_slice = slice(18, 19)
+
+        # Vars for fixed episodes
+        self.episode_length = 250
+        self.t = torch.zeros(self.num_envs, dtype = torch.int)
 
         # a few class buffers to store RL-related states
         self.obs = torch.zeros((self.num_envs, self._num_observations))
@@ -84,7 +100,7 @@ class RobotPuckTask(BaseTask):
         # TODO add random goal positioning here
         indices = torch.arange(self._robot.count, dtype=torch.int64, device=self._device)
         self.reset(indices)
-        self._robot.switch_control_mode("effort")
+        self._robot.switch_control_mode("velocity")
         print(self._robot.dof_names)
 
     def reset(self, env_ids=None):
@@ -103,6 +119,9 @@ class RobotPuckTask(BaseTask):
         self._robot.set_joint_positions(dof_pos, indices=indices)
         self._robot.set_joint_velocities(dof_vel, indices=indices)
 
+        print("Resetting")
+        self.t[env_ids] = 0
+
         self.resets[env_ids] = 0
 
     def pre_physics_step(self, actions) -> None:
@@ -112,11 +131,13 @@ class RobotPuckTask(BaseTask):
 
         actions = torch.tensor(actions)
 
-        forces = torch.zeros((self._robot.count, self._robot.num_dof), dtype=torch.float32, device=self._device)
-        forces[:, :] = self._max_push_effort * actions[0]
+        velocities = torch.zeros((self._robot.count, self._robot.num_dof), dtype=torch.float32, device=self._device)
+        velocities[:, :] = self.max_velocity_command * actions[0]
 
         indices = torch.arange(self._robot.count, dtype=torch.int32, device=self._device)
-        self._robot.set_joint_efforts(forces, indices = indices)
+        self._robot.set_joint_velocities(velocities, indices = indices)
+
+        self.t += 1
     
     def get_observations(self):
         tool_pos, tool_rot = self.tool_view.get_world_poses(clone=False)
@@ -124,9 +145,16 @@ class RobotPuckTask(BaseTask):
         dof_pos = self._robot.get_joint_positions()
         dof_vel = self._robot.get_joint_velocities()
 
+        #if torch.max(torch.abs(dof_pos / self.norm_dof_pos)) > 1.01:
+            #print("Warning: dof_pos larger than expected.", dof_pos)
+        #if torch.max(torch.abs(dof_vel / self.norm_dof_vel)) > 1.01:
+            #print("Warning: dof_vel larger than expected.", dof_vel)
+
         self.obs[:, self.tool_obs_slice] = tool_pos
-        self.obs[:, self.dof_pos_obs_slice] = dof_pos
-        self.obs[:, self.dof_vel_obs_slice] = dof_vel
+        self.obs[:, self.dof_pos_obs_slice] = dof_pos / self.norm_dof_pos
+        self.obs[:, self.dof_vel_obs_slice] = dof_vel / self.norm_dof_vel
+        self.obs[:, self.target_dist_obs_slice] = tool_pos - self._ball_position
+        self.obs[:, self.time_obs_slice] = self.t / float(self.episode_length)
         return self.obs
 
     def calculate_metrics(self) -> None:
@@ -145,7 +173,7 @@ class RobotPuckTask(BaseTask):
 
         # if curr_distance < 0.05:
         #     reward += 0.5
-        reward = 1.0 - curr_distance*curr_distance - 0.01 * torch.sum(torch.abs(dof_vel))
+        reward = 1.0 - 10.0 * curr_distance*curr_distance - 0.1 * torch.sum(torch.abs(dof_vel / self.max_velocity_command)) / 6
         reward = torch.where(curr_distance > 0.4, torch.ones_like(reward) * -2.0, reward)
         reward = torch.where(curr_distance < 0.05, torch.ones_like(reward) * 2.0, reward)
 
@@ -157,9 +185,9 @@ class RobotPuckTask(BaseTask):
         tool_pos = self.obs[:, self.tool_obs_slice]
         target = self._ball_position
 
-        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
+        #curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[0]) + torch.square(tool_pos[:, 1]  - target[1]) + torch.square(tool_pos[:, 2]  - target[2]))
         
-        resets = torch.where(curr_distance > 0.4, 1, 0)
+        resets = torch.where(self.t >= self.episode_length, 1, 0)
         self.resets = resets
 
         return resets.item()

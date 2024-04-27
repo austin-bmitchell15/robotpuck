@@ -197,9 +197,12 @@ pyrightconfig.json
 /.vscode/launch.json
 /.vscode/settings.json
 
+/.vs
+
 *.zip
 /robotpuck_tensorboard
 /hyperparam_optimization
 /cartpole_tensorboard
 /ddpg_optimization
 /a2c_optimization
+/td3_optimization
