@@ -40,7 +40,7 @@ class RobotPuckTask(BaseTask):
         self.prev_distance = -1.0
 
         # values used for defining RL buffers
-        self._num_observations = 19
+        self._num_observations = 22
         self._num_actions = 6
         self._device = "cpu"
         self.num_envs = 1
@@ -48,8 +48,9 @@ class RobotPuckTask(BaseTask):
         self.tool_obs_slice = slice(0, 3)
         self.dof_pos_obs_slice = slice(3, 9)
         self.dof_vel_obs_slice = slice(9, 15)
-        self.target_dist_obs_slice = slice(15, 18)
-        self.time_obs_slice = slice(18, 19)
+        self.ball_pos_obs_slice = slice(15, 18)
+        self.target_dist_obs_slice = slice(18, 21)
+        self.time_obs_slice = slice(21, 22)
 
         # Vars for fixed episodes
         self.episode_length = 250
