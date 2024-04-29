@@ -34,14 +34,15 @@ def objective(trial: optuna.Trial):
     model = A2C(
         "MlpPolicy", 
         env, 
-        learning_rate=learning_rate, 
+        learning_rate=learning_rate,
+        stats_window_size=4,
         n_steps=n_steps,
         gamma=gamma,
         gae_lambda=gae_lambda,
         ent_coef=ent_coef,
         vf_coef=vf_coef,
         verbose=0,
-        tensorboard_log="./a2c_optimization/run1"
+        tensorboard_log="./a2c_optimization/run3"
     )
     model.learn(total_timesteps=100000)
 
@@ -64,5 +65,5 @@ def objective(trial: optuna.Trial):
 
 # Optimize hyperparameters
 study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=10)
+study.optimize(objective, n_trials=100)
 print("Best hyperparameters:", study.best_params)

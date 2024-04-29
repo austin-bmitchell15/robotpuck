@@ -16,13 +16,14 @@ from stable_baselines3 import A2C
 model = A2C(
     "MlpPolicy",
     env,
-    learning_rate=0.0001545611100639787,
-    n_steps=10,
-    gamma=0.9743440077383112,
-    gae_lambda=0.9873083102572288,
-    ent_coef=0.0976156773245273,
-    vf_coef=0.42864533956805395,
-    verbose=1
+    n_steps= 20, 
+    learning_rate= 0.001570376198958359, 
+    gamma= 0.9154785103133573, 
+    gae_lambda= 0.9644010054106701, 
+    ent_coef= 0.09093196310755056, 
+    vf_coef= 0.43795677412063205,
+    verbose=1,
+    tensorboard_log="./a2c_training/"
 )
 
 # Train the model

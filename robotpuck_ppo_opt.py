@@ -42,7 +42,7 @@ def objective(trial: optuna.Trial) -> float:
         vf_coef=vf_coef,
         max_grad_norm=max_grad_norm,
         verbose=0,
-        tensorboard_log="./hyperparam_optimization/run4"
+        tensorboard_log="./ppo_optimization/run4"
     )
     model.learn(total_timesteps=200000)
 

@@ -25,7 +25,8 @@ model = DDPG(
     learning_rate= 0.002192963766359842, 
     tau= 0.0015661843317282323, 
     gamma= 0.9988993766824212,
-    verbose=1
+    verbose=1,
+    tensorboard_log="./ddpg_training/"
 )
 
 model.learn(total_timesteps=100000)

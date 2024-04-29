@@ -25,7 +25,7 @@ model = PPO(
     vf_coef=0.0020737398594318467,
     max_grad_norm=0.9,
     verbose=1,
-    tensorboard_log="./robotpuck_tensorboard"
+    tensorboard_log="./ppo_training"
 )
 model.learn(total_timesteps=1000000)
 model.save("joint_obs_test")

@@ -4,6 +4,7 @@ from omni.isaac.core.tasks.base_task import BaseTask
 from omni.isaac.core.articulations import ArticulationView
 from omni.isaac.core.utils.prims import create_prim
 from omni.isaac.core.prims import RigidPrimView
+from omni.isaac.core.objects import DynamicSphere, VisualSphere
 
 from omni.isaac.core.utils.viewports import set_camera_view
 
@@ -23,7 +24,6 @@ class RobotPuckTask(BaseTask):
         # task-specific parameters
         self._robot_arm_pos = [0.0, 0.0, 0.0]
         # TODO randomize these
-        self._ball_position = torch.rand(3) * 0.15 + 0.25
         self._ball_position = torch.tensor([0.4, 0.0, 0.4])
         self._goal_position = [0.0, 6.0, 0.0]
         
@@ -79,16 +79,16 @@ class RobotPuckTask(BaseTask):
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur3/ur3.usd"
         # add the robot USD to our stage
         create_prim(prim_path="/World/Robot", prim_type="Xform", position=self._robot_arm_pos)
+        #self._ball = DynamicSphere(prim_path="/World/Ball", name="ball_view", color=np.array([1.0, 0.0, 0.0]), mass=1.0, radius=0.1, position=self._ball_position)
+        self._ball = VisualSphere(prim_path="/World/Ball", name="ball_view", color=np.array([1.0, 0.0, 0.0]), radius=0.1, position=self._ball_position)
         add_reference_to_stage(usd_path, "/World/Robot")
-        create_prim(prim_path="/World/Ball", prim_type="Sphere", attributes={"radius": 0.1}, position=self._ball_position)
         create_prim(prim_path="/World/Goal", prim_type="Sphere", attributes={"radius": 0.05}, position=self._goal_position)
 
         self._robot = ArticulationView(prim_paths_expr="/World/Robot*", name="robot_view")
-        self._ball = RigidPrimView(prim_paths_expr="/World/Ball*", name="ball_view")
         self.tool_view = RigidPrimView(prim_paths_expr="/World/Robot/tool0", name="tool_view", reset_xform_properties=False)
 
         # add ArticulationView and ground plane to the Scene
-        scene.add(self.tool_view) 
+        scene.add(self.tool_view)
         scene.add(self._robot)
         scene.add(self._ball)
         scene.add_default_ground_plane()
@@ -104,7 +104,6 @@ class RobotPuckTask(BaseTask):
         indices = torch.arange(self._robot.count, dtype=torch.int64, device=self._device)
         self.reset(indices)
         self._robot.switch_control_mode("velocity")
-        print(self._robot.dof_names)
 
     def reset(self, env_ids=None):
         if env_ids is None:
@@ -118,12 +117,11 @@ class RobotPuckTask(BaseTask):
 
         dof_pos = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
         dof_vel = torch.zeros((num_resets, self._robot.num_dof), device=self._device)
-        self._ball_position = torch.rand((num_resets, 3)) * 0.15 + 0.25
 
         indices = env_ids.to(dtype=torch.int32)
         self._robot.set_joint_positions(dof_pos, indices=indices)
         self._robot.set_joint_velocities(dof_vel, indices=indices)
-        self._ball.set_world_poses(self._ball_position)
+        self._ball.set_world_pose(self._ball_position)
 
         print("Resetting")
         self.t[env_ids] = 0
@@ -150,7 +148,7 @@ class RobotPuckTask(BaseTask):
 
         dof_pos = self._robot.get_joint_positions()
         dof_vel = self._robot.get_joint_velocities()
-        dof_ball_pos = self._ball_position
+        ball_pos, ball_rot = self._ball.get_world_pose()
 
         #if torch.max(torch.abs(dof_pos / self.norm_dof_pos)) > 1.01:
             #print("Warning: dof_pos larger than expected.", dof_pos)
@@ -160,7 +158,7 @@ class RobotPuckTask(BaseTask):
         self.obs[:, self.tool_obs_slice] = tool_pos
         self.obs[:, self.dof_pos_obs_slice] = dof_pos / self.norm_dof_pos
         self.obs[:, self.dof_vel_obs_slice] = dof_vel / self.norm_dof_vel
-        self.obs[:, self.dof_ball_pos_slice] = dof_ball_pos
+        self.obs[:, self.ball_pos_obs_slice] = ball_pos
         self.obs[:, self.target_dist_obs_slice] = tool_pos - self._ball_position
         self.obs[:, self.time_obs_slice] = self.t / float(self.episode_length)
         return self.obs
@@ -168,8 +166,8 @@ class RobotPuckTask(BaseTask):
     def calculate_metrics(self) -> None:
         tool_pos = self.obs[:, self.tool_obs_slice]
         dof_vel = self.obs[:, self.dof_vel_obs_slice]
-        target = self._ball_position
-        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target[:, 0]) + torch.square(tool_pos[:, 1]  - target[:, 1]) + torch.square(tool_pos[:, 2]  - target[:, 2]))
+        target_pos, target_rot = self._ball.get_world_pose()
+        curr_distance = torch.sqrt(torch.square(tool_pos[:, 0]  - target_pos[0]) + torch.square(tool_pos[:, 1]  - target_pos[1]) + torch.square(tool_pos[:, 2]  - target_pos[2]))
         # if curr_distance > 0.7:
         #     reward -= 2.0
 

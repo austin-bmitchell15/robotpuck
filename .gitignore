@@ -200,9 +200,3 @@ pyrightconfig.json
 /.vs
 
 *.zip
-/robotpuck_tensorboard
-/hyperparam_optimization
-/cartpole_tensorboard
-/ddpg_optimization
-/a2c_optimization
-/td3_optimization
